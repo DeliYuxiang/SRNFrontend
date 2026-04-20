@@ -1,11 +1,6 @@
 import type { Ref } from "vue";
 import type { Identity, Challenge } from "../types/api";
-
-async function bytesToHex(buf: ArrayBuffer): Promise<string> {
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+import { bytesToHex } from "../utils/hex";
 
 export function useSRNClient(
   identity: Ref<Identity | null>,
@@ -26,7 +21,7 @@ export function useSRNClient(
     return {
       "X-SRN-PubKey": id.pubHex,
       "X-SRN-Nonce": challenge.value.nonce,
-      "X-SRN-Signature": await bytesToHex(sig),
+      "X-SRN-Signature": bytesToHex(sig),
     };
   }
 
@@ -65,7 +60,7 @@ export function useSRNClient(
       ...(opts.headers as Record<string, string> | undefined),
       "X-SRN-PubKey": id.pubHex,
       "X-SRN-Nonce": challenge.value.nonce,
-      "X-SRN-Signature": await bytesToHex(sig),
+      "X-SRN-Signature": bytesToHex(sig),
     };
 
     const res = await fetch(url, { ...opts, headers });

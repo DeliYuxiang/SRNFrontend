@@ -1,10 +1,7 @@
 import type { PowWorkerRequest, PowWorkerMessage } from "../types/api";
+import { bytesToHex } from "../utils/hex";
 
-async function bytesToHex(buf: ArrayBuffer): Promise<string> {
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+const encoder = new TextEncoder();
 
 async function mineNonce(
   salt: string,
@@ -18,11 +15,12 @@ async function mineNonce(
 
   while (true) {
     const nonceStr = String(nonce);
-    const data = new TextEncoder().encode(salt + pubHex + nonceStr);
-    const hashBuf = await crypto.subtle.digest("SHA-256", data);
-    const hashHex = await bytesToHex(hashBuf);
+    const hashBuf = await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(salt + pubHex + nonceStr),
+    );
 
-    if (hashHex.startsWith(prefix)) return nonceStr;
+    if (bytesToHex(hashBuf).startsWith(prefix)) return nonceStr;
 
     nonce++;
     if (nonce % 500 === 0) {

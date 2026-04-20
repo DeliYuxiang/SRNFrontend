@@ -34,7 +34,7 @@ const emit = defineEmits<{
     />
 
     <div
-      v-if="!archives.length && !loading && searchInput"
+      v-if="!archives.length && searchInput"
       class="empty-state"
     >
       暂无索引结果

@@ -1,13 +1,8 @@
 import { ref } from "vue";
 import type { Identity } from "../types/api";
+import { bytesToHex } from "../utils/hex";
 
 const SRN_ID_STORE = "srn_identity_v3";
-
-async function bytesToHex(buf: ArrayBuffer): Promise<string> {
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
 
 async function loadOrCreateIdentity(): Promise<Identity> {
   const raw = localStorage.getItem(SRN_ID_STORE);
@@ -26,8 +21,8 @@ async function loadOrCreateIdentity(): Promise<Identity> {
   const pubBuf = await crypto.subtle.exportKey("raw", kp.publicKey);
   const privBuf = await crypto.subtle.exportKey("pkcs8", kp.privateKey);
   const id: Identity = {
-    pubHex: await bytesToHex(pubBuf),
-    privHex: await bytesToHex(privBuf),
+    pubHex: bytesToHex(pubBuf),
+    privHex: bytesToHex(privBuf),
   };
   localStorage.setItem(SRN_ID_STORE, JSON.stringify(id));
   return id;
