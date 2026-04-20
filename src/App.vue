@@ -15,6 +15,7 @@ import type {
   RelayStatus,
 } from "./types/api";
 import { API_BASE } from "./config";
+import { bytesToHex } from "./utils/hex";
 
 // ── State ────────────────────────────────────────────────────────────────────
 const searchInput = ref("");
@@ -27,6 +28,12 @@ const currentTitle = ref("");
 const totalEvents = ref(0);
 const relayStatus = ref<RelayStatus | null>(null);
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ── Import identity modal ─────────────────────────────────────────────────────
+const showImportModal = ref(false);
+const importPrivHex = ref("");
+const importPubHex = ref("");
+const importError = ref("");
 
 // ── Composables ──────────────────────────────────────────────────────────────
 const { identity, privKey, init: initIdentity } = useIdentity();
@@ -75,7 +82,7 @@ function onInput() {
     suggestions.value = [];
     return;
   }
-  debounceTimer = setTimeout(fetchSuggestions, 300);
+  debounceTimer = setTimeout(fetchSuggestions, 1000);
 }
 
 async function fetchSuggestions() {
@@ -234,6 +241,55 @@ const groupedResults = computed<ArchiveGroup[]>(() => {
 
   return Object.values(archives);
 });
+
+// ── Import identity ───────────────────────────────────────────────────────────
+async function doImportIdentity() {
+  importError.value = "";
+  let privHex = importPrivHex.value.trim().toLowerCase();
+  const pubHex = importPubHex.value.trim().toLowerCase();
+
+  // Some formats store seed+pubkey as 64 bytes — take only the first 32 (seed)
+  if (privHex.length === 128) privHex = privHex.slice(0, 64);
+
+  if (!/^[0-9a-f]{64}$/.test(privHex)) {
+    importError.value = "私钥需为64位十六进制（32字节种子）";
+    return;
+  }
+  if (!/^[0-9a-f]{64}$/.test(pubHex)) {
+    importError.value = "公钥需为64位十六进制（32字节）";
+    return;
+  }
+
+  try {
+    // Wrap raw 32-byte seed in Ed25519 PKCS8 envelope
+    const pkcs8Hex = "302e020100300506032b657004220420" + privHex;
+    const pkcs8Bytes = new Uint8Array(
+      pkcs8Hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+    );
+    // Verify the key is valid before saving
+    await crypto.subtle.importKey(
+      "pkcs8",
+      pkcs8Bytes.buffer as ArrayBuffer,
+      { name: "Ed25519" },
+      false,
+      ["sign"],
+    );
+
+    localStorage.setItem(
+      "srn_identity_v3",
+      JSON.stringify({ pubHex, privHex: bytesToHex(pkcs8Bytes.buffer as ArrayBuffer) }),
+    );
+
+    showImportModal.value = false;
+    importPrivHex.value = "";
+    importPubHex.value = "";
+
+    await initIdentity();
+    await refreshChallenge(identity.value!.pubHex);
+  } catch (_) {
+    importError.value = "密钥格式无效，请检查输入";
+  }
+}
 </script>
 
 <template>
@@ -243,7 +299,40 @@ const groupedResults = computed<ArchiveGroup[]>(() => {
       :powWorking="powWorking"
       :powAttempts="powAttempts"
       :relayStatus="relayStatus"
+      @import-identity="showImportModal = true"
     />
+
+    <!-- Import identity modal -->
+    <div v-if="showImportModal" class="modal-overlay" @click.self="showImportModal = false">
+      <div class="modal">
+        <h2 class="modal-title">导入密钥对</h2>
+        <label class="modal-label">
+          私钥（raw hex，32字节）
+          <input
+            v-model="importPrivHex"
+            class="modal-input"
+            placeholder="64位或128位十六进制"
+            spellcheck="false"
+            autocomplete="off"
+          />
+        </label>
+        <label class="modal-label">
+          公钥（raw hex，32字节）
+          <input
+            v-model="importPubHex"
+            class="modal-input"
+            placeholder="64位十六进制"
+            spellcheck="false"
+            autocomplete="off"
+          />
+        </label>
+        <p v-if="importError" class="modal-error">{{ importError }}</p>
+        <div class="modal-actions">
+          <button class="btn-cancel" @click="showImportModal = false">取消</button>
+          <button class="btn-confirm" @click="doImportIdentity">导入</button>
+        </div>
+      </div>
+    </div>
 
     <header class="hero">
       <h1>探索索引</h1>
@@ -291,5 +380,93 @@ const groupedResults = computed<ArchiveGroup[]>(() => {
 .hero p {
   color: #64748b;
   font-size: 1.125rem;
+}
+
+/* ── Import modal ────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 2rem;
+  width: 420px;
+  max-width: calc(100vw - 2rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+}
+
+.modal-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.modal-input {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  outline: none;
+  color: #0f172a;
+}
+
+.modal-input:focus {
+  border-color: #3b82f6;
+}
+
+.modal-error {
+  font-size: 0.8rem;
+  color: #dc2626;
+  margin: 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.btn-cancel,
+.btn-confirm {
+  padding: 0.45rem 1.1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-cancel {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn-confirm {
+  background: #3b82f6;
+  color: #fff;
+  font-weight: 500;
+}
+
+.btn-confirm:hover {
+  background: #2563eb;
 }
 </style>
