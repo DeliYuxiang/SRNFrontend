@@ -7,11 +7,11 @@ export default defineConfig({
   server: {
     proxy: {
       "/v1": {
-        target: "https://srn.majiyabakunai.moe",
+        target: "https://srn-worker.delibill.workers.dev",
         changeOrigin: true,
       },
       "/favicon.svg": {
-        target: "http://localhost:8787",
+        target: "https://srn-worker.delibill.workers.dev",
         changeOrigin: true,
       },
     },

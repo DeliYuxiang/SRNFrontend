@@ -12,6 +12,7 @@ import type {
   ArchiveGroup,
   SeasonGroup,
   LangGroup,
+  RelayStatus,
 } from "./types/api";
 import { API_BASE } from "./config";
 
@@ -24,6 +25,7 @@ const suggestions = ref<TMDBResult[]>([]);
 const seasonCounts = ref<Record<number, number | null>>({});
 const currentTitle = ref("");
 const totalEvents = ref(0);
+const relayStatus = ref<RelayStatus | null>(null);
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ── Composables ──────────────────────────────────────────────────────────────
@@ -39,17 +41,30 @@ const { srnFetch, srnFetchDownload } = useSRNClient(
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(async () => {
   await initIdentity();
-  await refreshChallenge(identity.value!.pubHex);
 
-  // Fetch total event count for the hero subtitle
-  try {
-    const res = await fetch(`${API_BASE}/v1/health`);
-    const data = (await res.json()) as { message?: string };
+  // Fetch relay health + identity in parallel with PoW challenge
+  const [, healthRes, identityRes] = await Promise.allSettled([
+    refreshChallenge(identity.value!.pubHex),
+    fetch(`${API_BASE}/v1/health`),
+    fetch(`${API_BASE}/v1/identity`),
+  ]);
+
+  // Health → totalEvents counter
+  if (healthRes.status === "fulfilled" && healthRes.value.ok) {
+    const data = (await healthRes.value.json()) as { message?: string };
     const match = data.message?.match(/(\d+)/);
     if (match) totalEvents.value = parseInt(match[1], 10);
-  } catch (_) {
-    // Non-critical — leave at 0
   }
+
+  // Identity → relay pubkey + health status
+  const healthy =
+    healthRes.status === "fulfilled" && healthRes.value.ok;
+  let pubkey = "";
+  if (identityRes.status === "fulfilled" && identityRes.value.ok) {
+    const data = (await identityRes.value.json()) as { pubkey?: string };
+    pubkey = data.pubkey ?? "";
+  }
+  relayStatus.value = { pubkey, healthy };
 });
 
 // ── Search ───────────────────────────────────────────────────────────────────
@@ -227,6 +242,7 @@ const groupedResults = computed<ArchiveGroup[]>(() => {
       :identity="identity"
       :powWorking="powWorking"
       :powAttempts="powAttempts"
+      :relayStatus="relayStatus"
     />
 
     <header class="hero">

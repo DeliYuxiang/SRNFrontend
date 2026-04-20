@@ -59,6 +59,11 @@ export interface ArchiveGroup {
   seasons: Record<string | number, SeasonGroup>;
 }
 
+export interface RelayStatus {
+  pubkey: string;   // RELAY_PUBLIC_KEY from /v1/identity, "" if unset
+  healthy: boolean; // false if fetch fails or returns non-2xx
+}
+
 // PoW worker messages
 export interface PowWorkerRequest {
   salt: string;
