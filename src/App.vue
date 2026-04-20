@@ -13,6 +13,7 @@ import type {
   SeasonGroup,
   LangGroup,
 } from "./types/api";
+import { API_BASE } from "./config";
 
 // ── State ────────────────────────────────────────────────────────────────────
 const searchInput = ref("");
@@ -42,7 +43,7 @@ onMounted(async () => {
 
   // Fetch total event count for the hero subtitle
   try {
-    const res = await fetch("/v1/health");
+    const res = await fetch(`${API_BASE}/v1/health`);
     const data = (await res.json()) as { message?: string };
     const match = data.message?.match(/(\d+)/);
     if (match) totalEvents.value = parseInt(match[1], 10);
@@ -65,7 +66,7 @@ function onInput() {
 async function fetchSuggestions() {
   try {
     const fresh = tmdbEnabled.value ? "&fresh=1" : "";
-    const url = `/v1/tmdb/search?q=${encodeURIComponent(searchInput.value)}${fresh}`;
+    const url = `${API_BASE}/v1/tmdb/search?q=${encodeURIComponent(searchInput.value)}${fresh}`;
     const res = await srnFetch(url);
     const data = (await res.json()) as { results?: TMDBResult[] };
     suggestions.value = data.results ?? [];
@@ -103,7 +104,7 @@ async function fetchEvents(id: number) {
   suggestions.value = [];
   seasonCounts.value = {};
   try {
-    const res = await srnFetch(`/v1/events?tmdb=${id}`);
+    const res = await srnFetch(`${API_BASE}/v1/events?tmdb=${id}`);
     const data = (await res.json()) as { events?: SRNEvent[] };
     results.value = data.events ?? [];
 
@@ -126,7 +127,7 @@ async function fetchSeasonCounts(tmdbId: number, seasons: number[]) {
     seasons.map(async (s) => {
       try {
         const res = await srnFetch(
-          `/v1/tmdb/season?tmdb_id=${tmdbId}&season=${s}`,
+          `${API_BASE}/v1/tmdb/season?tmdb_id=${tmdbId}&season=${s}`,
         );
         const data = (await res.json()) as { episode_count?: number };
         counts[s] = data.episode_count ?? null;
@@ -140,7 +141,7 @@ async function fetchSeasonCounts(tmdbId: number, seasons: number[]) {
 
 // ── Download ─────────────────────────────────────────────────────────────────
 async function downloadSingle(item: SRNEvent) {
-  const res = await srnFetchDownload(`/v1/events/${item.id}/content`);
+  const res = await srnFetchDownload(`${API_BASE}/v1/events/${item.id}/content`);
   if (!res.ok) {
     alert("下载失败");
     return;
@@ -170,6 +171,11 @@ const groupedResults = computed<ArchiveGroup[]>(() => {
   for (const item of results.value) {
     const aKey = item.archive_md5 ?? item.id;
     if (!archives[aKey]) {
+      // tags is returned from the API as a JSON string (stored as TEXT in D1)
+      const rawTags = item.tags as unknown as string;
+      const parsedTags: string[][] =
+        typeof rawTags === "string" ? JSON.parse(rawTags) : rawTags;
+      const groupTag = parsedTags.find((t) => t[0] === "group");
       archives[aKey] = {
         key: aKey,
         archive_md5: item.archive_md5,
@@ -177,6 +183,7 @@ const groupedResults = computed<ArchiveGroup[]>(() => {
         source_type: item.source_type,
         pubkey: item.pubkey,
         tmdb_id: item.tmdb_id,
+        group: groupTag?.[1] ?? null,
         seasons: {},
       };
     }
@@ -241,7 +248,6 @@ const groupedResults = computed<ArchiveGroup[]>(() => {
       <ResultsGrid
         :loading="loading"
         :archives="groupedResults"
-        :currentTitle="currentTitle"
         :seasonCounts="seasonCounts"
         :searchInput="searchInput"
         @downloadSingle="downloadSingle"

@@ -6,7 +6,6 @@ import LoadingCard from "./LoadingCard.vue";
 defineProps<{
   loading: boolean;
   archives: ArchiveGroup[];
-  currentTitle: string;
   seasonCounts: Record<number, number | null>;
   searchInput: string;
 }>();
@@ -27,7 +26,6 @@ const emit = defineEmits<{
       v-for="archive in archives"
       :key="archive.key"
       :archive="archive"
-      :currentTitle="currentTitle"
       :seasonCounts="seasonCounts"
       @downloadSingle="emit('downloadSingle', $event)"
       @downloadLangPack="(season, lang, items) => emit('downloadLangPack', season, lang, items)"

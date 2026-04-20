@@ -1,0 +1,8 @@
+# Cloudflare Pages transparent proxy rules.
+# Status 200 = rewrite (server-side proxy), browser sees same origin, no CORS needed.
+#
+# Replace the target with your worker's URL:
+#   - Before domain migration: https://srn.majiyabakunai.moe
+#   - After domain migration:  https://srn-worker.YOUR_ACCOUNT.workers.dev
+/v1/*         https://srn.majiyabakunai.moe/v1/:splat  200
+/favicon.svg  https://srn.majiyabakunai.moe/favicon.svg  200

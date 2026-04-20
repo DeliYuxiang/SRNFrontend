@@ -21,21 +21,27 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+      - name: Ensure Pages project exists
+        run: npx wrangler pages project create srn --production-branch=main 2>&1 || true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Deploy to Cloudflare Pages
         id: deploy
         run: |
+          set -o pipefail
           if [ "${{ github.event_name }}" = "push" ]; then
-            OUTPUT=$(npx wrangler pages deploy dist/ \
-              --project-name=srnfrontend \
-              --branch=main 2>&1)
+            npx wrangler pages deploy dist/ \
+              --project-name=srn \
+              --branch=main 2>&1 | tee /tmp/wrangler-out.txt
           else
             BRANCH=$(echo "${{ github.head_ref }}" | sed 's/[^a-zA-Z0-9-]/-/g' | cut -c1-28)
-            OUTPUT=$(npx wrangler pages deploy dist/ \
-              --project-name=srnfrontend \
-              --branch="$BRANCH" 2>&1)
+            npx wrangler pages deploy dist/ \
+              --project-name=srn \
+              --branch="$BRANCH" 2>&1 | tee /tmp/wrangler-out.txt
           fi
-          echo "$OUTPUT"
-          URL=$(echo "$OUTPUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.pages\.dev' | head -n1)
+          URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.pages\.dev' /tmp/wrangler-out.txt | head -n1)
           echo "url=${URL}" >> $GITHUB_OUTPUT
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -55,6 +55,7 @@ export interface ArchiveGroup {
   source_type: string | null;
   pubkey: string;
   tmdb_id: number;
+  group: string | null;
   seasons: Record<string | number, SeasonGroup>;
 }
 

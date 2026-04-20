@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import type { Challenge, PowWorkerMessage, PowWorkerRequest } from "../types/api";
+import { API_BASE } from "../config";
 
 export function usePoW() {
   const challenge = ref<Challenge>({ salt: "", k: 0, nonce: "", vip: false });
@@ -11,7 +12,7 @@ export function usePoW() {
     powAttempts.value = 0;
 
     try {
-      const res = await fetch("/v1/challenge", {
+      const res = await fetch(`${API_BASE}/v1/challenge`, {
         headers: { "X-SRN-PubKey": pubHex },
       });
       const ch = (await res.json()) as Omit<Challenge, "nonce">;

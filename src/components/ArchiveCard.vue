@@ -3,7 +3,6 @@ import type { ArchiveGroup, SRNEvent } from "../types/api";
 
 const props = defineProps<{
   archive: ArchiveGroup;
-  currentTitle: string;
   seasonCounts: Record<number, number | null>;
 }>();
 
@@ -11,6 +10,16 @@ const emit = defineEmits<{
   downloadSingle: [item: SRNEvent];
   downloadLangPack: [season: number | null, lang: string, items: SRNEvent[]];
 }>();
+
+function epStatus(
+  count: number,
+  seasonNum: number | null,
+): "complete" | "incomplete" | "unknown" {
+  if (seasonNum == null) return "unknown";
+  const total = props.seasonCounts[seasonNum];
+  if (total == null) return "unknown";
+  return count >= total ? "complete" : "incomplete";
+}
 </script>
 
 <template>
@@ -18,7 +27,7 @@ const emit = defineEmits<{
     <!-- Archive header -->
     <div class="archive-header">
       <span class="archive-title">
-        {{ props.currentTitle || "TMDB\u00a0" + props.archive.tmdb_id }}
+        {{ props.archive.group ?? "未知字幕组" }}
       </span>
       <template v-if="props.archive.source_uri">
         <span class="header-sep">·</span>
@@ -57,7 +66,7 @@ const emit = defineEmits<{
           {{ props.archive.archive_md5.substring(0, 10) }}…
         </span>
         <span class="pubkey-badge" :title="props.archive.pubkey">
-          {{ props.archive.pubkey.substring(0, 16) }}…
+          上传者&nbsp;{{ props.archive.pubkey.substring(0, 12) }}…
         </span>
       </div>
     </div>
@@ -78,7 +87,13 @@ const emit = defineEmits<{
             }}
           </span>
           <span class="tag tag-lang">{{ lang }}</span>
-          <span class="ep-count">
+          <span
+            class="ep-count"
+            :class="{
+              'ep-count--complete': epStatus(langGroup.items.length, season.season) === 'complete',
+              'ep-count--incomplete': epStatus(langGroup.items.length, season.season) === 'incomplete',
+            }"
+          >
             {{ langGroup.items.length
             }}<template
               v-if="
@@ -231,6 +246,21 @@ const emit = defineEmits<{
   font-family: "JetBrains Mono", monospace;
   font-size: 0.72rem;
   color: #64748b;
+  padding: 0.18rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid transparent;
+}
+
+.ep-count--complete {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.ep-count--incomplete {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
 }
 
 .pack-btn {
