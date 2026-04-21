@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+
+const appVersion = __APP_VERSION__;
 import NavBar from "./components/NavBar.vue";
 import SearchBar from "./components/SearchBar.vue";
 import ResultsGrid from "./components/ResultsGrid.vue";
@@ -26,6 +28,8 @@ const suggestions = ref<TMDBResult[]>([]);
 const seasonCounts = ref<Record<number, number | null>>({});
 const currentTitle = ref("");
 const totalEvents = ref(0);
+const uniqueTitles = ref(0);
+const uniqueEpisodes = ref(0);
 const relayStatus = ref<RelayStatus | null>(null);
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -45,28 +49,38 @@ const { searchEvents, searchTMDB, getSeasonInfo, downloadContent } =
 onMounted(async () => {
   await initIdentity();
 
-  // Fetch relay health + identity in parallel with PoW challenge
-  const [, healthRes, identityRes] = await Promise.allSettled([
+  // Fetch relay info + identity in parallel with PoW challenge
+  const [, relayRes, identityRes] = await Promise.allSettled([
     refreshChallenge(identity.value!.pubHex),
-    fetch(`${API_BASE}/v1/health`),
+    fetch(`${API_BASE}/v1/relay`),
     fetch(`${API_BASE}/v1/identity`),
   ]);
 
-  // Health → totalEvents counter
-  if (healthRes.status === "fulfilled" && healthRes.value.ok) {
-    const data = (await healthRes.value.json()) as { message?: string };
-    const match = data.message?.match(/(\d+)/);
-    if (match) totalEvents.value = parseInt(match[1], 10);
+  // Relay → stats counters
+  if (relayRes.status === "fulfilled" && relayRes.value.ok) {
+    const data = (await relayRes.value.json()) as {
+      totalEvents?: number;
+      uniqueTitles?: number;
+      uniqueEpisodes?: number;
+    };
+    totalEvents.value = data.totalEvents ?? 0;
+    uniqueTitles.value = data.uniqueTitles ?? 0;
+    uniqueEpisodes.value = data.uniqueEpisodes ?? 0;
   }
 
-  // Identity → relay pubkey + health status
-  const healthy = healthRes.status === "fulfilled" && healthRes.value.ok;
+  // Identity → relay pubkey + health status + worker version
+  const healthy = relayRes.status === "fulfilled" && relayRes.value.ok;
   let pubkey = "";
+  let version = "";
   if (identityRes.status === "fulfilled" && identityRes.value.ok) {
-    const data = (await identityRes.value.json()) as { pubkey?: string };
+    const data = (await identityRes.value.json()) as {
+      pubkey?: string;
+      version?: string;
+    };
     pubkey = data.pubkey ?? "";
+    version = data.version ?? "";
   }
-  relayStatus.value = { pubkey, healthy };
+  relayStatus.value = { pubkey, healthy, version };
 });
 
 // ── Search ───────────────────────────────────────────────────────────────────
@@ -320,7 +334,22 @@ async function doImportIdentity() {
 
     <header class="hero">
       <h1>探索索引</h1>
-      <p>基于 {{ totalEvents }} 条全球字幕元数据记录</p>
+      <div class="hero-stats">
+        <span class="hero-stat">
+          <span class="hero-stat-num">{{ totalEvents.toLocaleString() }}</span>
+          <span class="hero-stat-label">条字幕记录</span>
+        </span>
+        <span class="hero-stat-sep">·</span>
+        <span class="hero-stat">
+          <span class="hero-stat-num">{{ uniqueTitles.toLocaleString() }}</span>
+          <span class="hero-stat-label">部作品</span>
+        </span>
+        <span class="hero-stat-sep">·</span>
+        <span class="hero-stat">
+          <span class="hero-stat-num">{{ uniqueEpisodes.toLocaleString() }}</span>
+          <span class="hero-stat-label">集/集合</span>
+        </span>
+      </div>
     </header>
 
     <main>
@@ -344,7 +373,14 @@ async function doImportIdentity() {
       />
     </main>
 
-    <footer>SRN CLOUDLESS · 去中心化字幕索引网络</footer>
+    <footer>
+      SRN CLOUDLESS · 去中心化字幕索引网络
+      <span class="footer-versions">
+        <span class="version-tag">前端 v{{ appVersion }}</span>
+        <span class="version-sep">·</span>
+        <span class="version-tag">中继 {{ relayStatus?.version ? 'v' + relayStatus.version : '—' }}</span>
+      </span>
+    </footer>
   </div>
 </template>
 
@@ -361,9 +397,29 @@ async function doImportIdentity() {
   color: #0f172a;
 }
 
-.hero p {
+.hero-stats {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
   color: #64748b;
   font-size: 1.125rem;
+}
+
+.hero-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.hero-stat-num {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.hero-stat-sep {
+  opacity: 0.4;
 }
 
 /* ── Import modal ────────────────────────────────────────────── */
@@ -452,5 +508,27 @@ async function doImportIdentity() {
 
 .btn-confirm:hover {
   background: #2563eb;
+}
+
+/* ── Footer versions ─────────────────────────────────────────── */
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.footer-versions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.version-sep {
+  opacity: 0.5;
 }
 </style>

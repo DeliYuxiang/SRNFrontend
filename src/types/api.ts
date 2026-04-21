@@ -62,6 +62,7 @@ export interface ArchiveGroup {
 export interface RelayStatus {
   pubkey: string;   // RELAY_PUBLIC_KEY from /v1/identity, "" if unset
   healthy: boolean; // false if fetch fails or returns non-2xx
+  version: string;  // worker version from /v1/identity, "" if unavailable
 }
 
 // PoW worker messages
