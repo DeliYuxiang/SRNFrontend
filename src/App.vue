@@ -38,12 +38,8 @@ const importError = ref("");
 // ── Composables ──────────────────────────────────────────────────────────────
 const { identity, privKey, init: initIdentity } = useIdentity();
 const { challenge, powWorking, powAttempts, refreshChallenge } = usePoW();
-const { srnFetch, srnFetchDownload } = useSRNClient(
-  identity,
-  privKey,
-  challenge,
-  refreshChallenge,
-);
+const { searchEvents, searchTMDB, getSeasonInfo, downloadContent } =
+  useSRNClient(identity, privKey, challenge, refreshChallenge);
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(async () => {
@@ -64,8 +60,7 @@ onMounted(async () => {
   }
 
   // Identity → relay pubkey + health status
-  const healthy =
-    healthRes.status === "fulfilled" && healthRes.value.ok;
+  const healthy = healthRes.status === "fulfilled" && healthRes.value.ok;
   let pubkey = "";
   if (identityRes.status === "fulfilled" && identityRes.value.ok) {
     const data = (await identityRes.value.json()) as { pubkey?: string };
@@ -87,11 +82,7 @@ function onInput() {
 
 async function fetchSuggestions() {
   try {
-    const fresh = tmdbEnabled.value ? "&fresh=1" : "";
-    const url = `${API_BASE}/v1/tmdb/search?q=${encodeURIComponent(searchInput.value)}${fresh}`;
-    const res = await srnFetch(url);
-    const data = (await res.json()) as { results?: TMDBResult[] };
-    suggestions.value = data.results ?? [];
+    suggestions.value = await searchTMDB(searchInput.value, tmdbEnabled.value);
   } catch (e) {
     console.error("fetchSuggestions:", e);
   }
@@ -126,9 +117,7 @@ async function fetchEvents(id: number) {
   suggestions.value = [];
   seasonCounts.value = {};
   try {
-    const res = await srnFetch(`${API_BASE}/v1/events?tmdb=${id}`);
-    const data = (await res.json()) as { events?: SRNEvent[] };
-    results.value = data.events ?? [];
+    results.value = await searchEvents({ tmdb: String(id) });
 
     const seasons = [
       ...new Set(
@@ -147,15 +136,7 @@ async function fetchSeasonCounts(tmdbId: number, seasons: number[]) {
   const counts: Record<number, number | null> = {};
   await Promise.all(
     seasons.map(async (s) => {
-      try {
-        const res = await srnFetch(
-          `${API_BASE}/v1/tmdb/season?tmdb_id=${tmdbId}&season=${s}`,
-        );
-        const data = (await res.json()) as { episode_count?: number };
-        counts[s] = data.episode_count ?? null;
-      } catch (_) {
-        counts[s] = null;
-      }
+      counts[s] = await getSeasonInfo(tmdbId, s).catch(() => null);
     }),
   );
   seasonCounts.value = counts;
@@ -163,7 +144,7 @@ async function fetchSeasonCounts(tmdbId: number, seasons: number[]) {
 
 // ── Download ─────────────────────────────────────────────────────────────────
 async function downloadSingle(item: SRNEvent) {
-  const res = await srnFetchDownload(`${API_BASE}/v1/events/${item.id}/content`);
+  const res = await downloadContent(item.id);
   if (!res.ok) {
     alert("下载失败");
     return;
@@ -193,11 +174,7 @@ const groupedResults = computed<ArchiveGroup[]>(() => {
   for (const item of results.value) {
     const aKey = item.archive_md5 ?? item.id;
     if (!archives[aKey]) {
-      // tags is returned from the API as a JSON string (stored as TEXT in D1)
-      const rawTags = item.tags as unknown as string;
-      const parsedTags: string[][] =
-        typeof rawTags === "string" ? JSON.parse(rawTags) : rawTags;
-      const groupTag = parsedTags.find((t) => t[0] === "group");
+      const groupTag = item.tags.find((t) => t[0] === "group");
       archives[aKey] = {
         key: aKey,
         archive_md5: item.archive_md5,
@@ -232,9 +209,7 @@ const groupedResults = computed<ArchiveGroup[]>(() => {
   for (const arc of Object.values(archives)) {
     for (const season of Object.values(arc.seasons)) {
       for (const lg of Object.values(season.languages)) {
-        lg.items.sort(
-          (x, y) => (x.episode_num ?? 0) - (y.episode_num ?? 0),
-        );
+        lg.items.sort((x, y) => (x.episode_num ?? 0) - (y.episode_num ?? 0));
       }
     }
   }
@@ -277,7 +252,10 @@ async function doImportIdentity() {
 
     localStorage.setItem(
       "srn_identity_v3",
-      JSON.stringify({ pubHex, privHex: bytesToHex(pkcs8Bytes.buffer as ArrayBuffer) }),
+      JSON.stringify({
+        pubHex,
+        privHex: bytesToHex(pkcs8Bytes.buffer as ArrayBuffer),
+      }),
     );
 
     showImportModal.value = false;
@@ -303,7 +281,11 @@ async function doImportIdentity() {
     />
 
     <!-- Import identity modal -->
-    <div v-if="showImportModal" class="modal-overlay" @click.self="showImportModal = false">
+    <div
+      v-if="showImportModal"
+      class="modal-overlay"
+      @click.self="showImportModal = false"
+    >
       <div class="modal">
         <h2 class="modal-title">导入密钥对</h2>
         <label class="modal-label">
@@ -328,7 +310,9 @@ async function doImportIdentity() {
         </label>
         <p v-if="importError" class="modal-error">{{ importError }}</p>
         <div class="modal-actions">
-          <button class="btn-cancel" @click="showImportModal = false">取消</button>
+          <button class="btn-cancel" @click="showImportModal = false">
+            取消
+          </button>
           <button class="btn-confirm" @click="doImportIdentity">导入</button>
         </div>
       </div>

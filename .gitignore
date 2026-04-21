@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# Auto-generated from /doc — rebuilt in CI, do not commit
+src/types/srn-api.d.ts
 .env*
 !.env.example
 *.local
