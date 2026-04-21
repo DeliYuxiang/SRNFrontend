@@ -26,14 +26,15 @@ The worker is the **single entry point** for both the API and the frontend. The 
 ## Commands
 
 ```bash
-npm run dev          # Start dev server (proxies /v1/* and /ui /doc to the worker)
-npm run build        # Type-check with vue-tsc, then build to dist/
-npm run preview      # Preview the production build locally
-npm run format:check # Check formatting (CI gate)
-npm run format:fix   # Auto-fix formatting
+npm run dev           # Start dev server (proxies /v1/*, /ui, /doc, /favicon.svg to the worker)
+npm run build         # Type-check with vue-tsc, then build to dist/
+npm run preview       # Preview the production build locally
+npm run format:check  # Check formatting (CI gate)
+npm run format:fix    # Auto-fix formatting
+npm run generate:api  # Regenerate src/types/srn-api.d.ts from the live worker OpenAPI schema
 ```
 
-There is no test suite. CI (`ci.yml`) runs `format:check` and `build` on PRs.
+There is no test suite. CI (`ci.yml`) runs `generate:api`, `format:check`, and `build` on PRs (in that order). The deploy workflow (`deploy.yml`) also runs `generate:api` before building.
 
 ## Architecture
 
@@ -45,11 +46,25 @@ Every API request requires a client identity and a solved Proof-of-Work challeng
 
 2. **`usePoW`** (`src/composables/usePoW.ts`) — fetches a challenge from `/v1/challenge` (salt + difficulty `k`), then spawns a Web Worker to mine a SHA-256 nonce. The worker posts progress every 500 attempts.
 
-3. **`useSRNClient`** (`src/composables/useSRNClient.ts`) — wraps `fetch` with auth headers (`X-SRN-PubKey`, `X-SRN-Nonce`, `X-SRN-Signature`). Regular requests sign the pubkey hex; download requests sign the current minute timestamp. On 401/403 it auto-refreshes the challenge and retries once.
+3. **`useSRNClient`** (`src/composables/useSRNClient.ts`) — thin wrapper around `createSRNClient` (from `src/lib/apiClient.ts`). Provides typed methods `searchEvents`, `searchTMDB`, `getSeasonInfo`, and `downloadContent`. On 401/403 it auto-refreshes the PoW challenge and retries once.
+
+4. **`src/lib/apiClient.ts`** — the actual HTTP client factory. Creates an `openapi-fetch` client typed against `src/types/srn-api.d.ts`, registers an auth middleware that injects `X-SRN-PubKey`, `X-SRN-Nonce`, and `X-SRN-Signature` headers. Regular requests sign the pubkey hex; download requests sign the current UTC minute (anti-replay).
 
 ### PoW Worker
 
 `src/workers/pow.worker.ts` runs in a dedicated Web Worker. It receives a `PowWorkerRequest` and iterates nonces until `SHA-256(salt + pubHex + nonce)` starts with `k` leading zeros. Bundled by Vite using `new Worker(new URL(...), { type: 'module' })`.
+
+### API endpoints used
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/v1/challenge` | Fetch PoW salt + difficulty |
+| GET | `/v1/relay` | Relay stats (totalEvents, uniqueTitles, uniqueEpisodes) |
+| GET | `/v1/identity` | Relay pubkey + worker version |
+| GET | `/v1/events` | Search subtitle events by tmdb/season/ep/language |
+| GET | `/v1/events/:id/content` | Download subtitle file |
+| GET | `/v1/tmdb/search` | TMDB title search (proxied through worker) |
+| GET | `/v1/tmdb/season` | Episode count for a TMDB season |
 
 ### Data model
 
@@ -57,10 +72,26 @@ Every API request requires a client identity and a solved Proof-of-Work challeng
 - `SRNEvent` — a subtitle record with TMDB metadata, season/episode, language, and archive references.
 - `ArchiveGroup → SeasonGroup → LangGroup → SRNEvent[]` — the hierarchy used to display grouped results in `App.vue`.
 - `Challenge` — salt, difficulty `k`, solved `nonce`, and `vip` flag.
+- `RelayStatus` — relay pubkey, health boolean, and worker version string (populated from `/v1/relay` + `/v1/identity` at startup).
+
+`src/types/srn-api.d.ts` is auto-generated from the worker's OpenAPI schema via `npm run generate:api`. Do not edit it by hand.
+
+### Component tree
+
+```
+App.vue
+  ├─ NavBar.vue          — logo, relay health chip, client pubkey chip, PoW status, import-key button
+  ├─ (import modal)      — inline in App.vue; imports raw-hex Ed25519 keypair
+  ├─ SearchBar.vue        — text input, TMDB toggle, search button
+  │    └─ AutocompleteDropdown.vue — TMDB search suggestions with poster thumbnails
+  └─ ResultsGrid.vue      — grid of search results (or LoadingCard skeletons)
+       ├─ LoadingCard.vue  — shimmer placeholder shown while fetching
+       └─ ArchiveCard.vue  — one card per subtitle archive group; shows season/lang rows with episode pills
+```
 
 ### Dev proxy
 
-`vite.config.ts` proxies `/v1/*`, `/ui`, and `/doc` to the worker so local dev works without CORS issues.
+`vite.config.ts` proxies `/v1/*`, `/ui`, `/doc`, and `/favicon.svg` to the worker so local dev works without CORS issues.
 
 ### Shared utility
 
@@ -68,4 +99,6 @@ Every API request requires a client identity and a solved Proof-of-Work challeng
 
 ## Deployment
 
-Merges to `main` deploy automatically to Cloudflare Pages via `deploy.yml`. PRs get a preview URL commented on them. The CF Pages URL is only the CDN origin — users should access the app through the worker's domain. Secrets required: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+Merges to `main` deploy automatically to Cloudflare Pages via `deploy.yml`. PRs also trigger a deploy and get a preview URL commented on them. The CF Pages URL is only the CDN origin — users should access the app through the worker's domain. Secrets required: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+
+<!-- doc-sha: 07a7fda972951778c3ac11528e074ae5162dd1fe -->

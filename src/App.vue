@@ -30,6 +30,8 @@ const currentTitle = ref("");
 const totalEvents = ref(0);
 const uniqueTitles = ref(0);
 const uniqueEpisodes = ref(0);
+const r2BlobCount = ref(0);
+const b2BlobCount = ref(0);
 const relayStatus = ref<RelayStatus | null>(null);
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -62,10 +64,14 @@ onMounted(async () => {
       totalEvents?: number;
       uniqueTitles?: number;
       uniqueEpisodes?: number;
+      r2BlobCount?: number;
+      b2BlobCount?: number;
     };
     totalEvents.value = data.totalEvents ?? 0;
     uniqueTitles.value = data.uniqueTitles ?? 0;
     uniqueEpisodes.value = data.uniqueEpisodes ?? 0;
+    r2BlobCount.value = data.r2BlobCount ?? 0;
+    b2BlobCount.value = data.b2BlobCount ?? 0;
   }
 
   // Identity → relay pubkey + health status + worker version
@@ -286,41 +292,22 @@ async function doImportIdentity() {
 
 <template>
   <div class="container">
-    <NavBar
-      :identity="identity"
-      :powWorking="powWorking"
-      :powAttempts="powAttempts"
-      :relayStatus="relayStatus"
-      @import-identity="showImportModal = true"
-    />
+    <NavBar :identity="identity" :powWorking="powWorking" :powAttempts="powAttempts" :relayStatus="relayStatus"
+      @import-identity="showImportModal = true" />
 
     <!-- Import identity modal -->
-    <div
-      v-if="showImportModal"
-      class="modal-overlay"
-      @click.self="showImportModal = false"
-    >
+    <div v-if="showImportModal" class="modal-overlay" @click.self="showImportModal = false">
       <div class="modal">
         <h2 class="modal-title">导入密钥对</h2>
         <label class="modal-label">
           私钥（raw hex，32字节）
-          <input
-            v-model="importPrivHex"
-            class="modal-input"
-            placeholder="64位或128位十六进制"
-            spellcheck="false"
-            autocomplete="off"
-          />
+          <input v-model="importPrivHex" class="modal-input" placeholder="64位或128位十六进制" spellcheck="false"
+            autocomplete="off" />
         </label>
         <label class="modal-label">
           公钥（raw hex，32字节）
-          <input
-            v-model="importPubHex"
-            class="modal-input"
-            placeholder="64位十六进制"
-            spellcheck="false"
-            autocomplete="off"
-          />
+          <input v-model="importPubHex" class="modal-input" placeholder="64位十六进制" spellcheck="false"
+            autocomplete="off" />
         </label>
         <p v-if="importError" class="modal-error">{{ importError }}</p>
         <div class="modal-actions">
@@ -346,31 +333,32 @@ async function doImportIdentity() {
         </span>
         <span class="hero-stat-sep">·</span>
         <span class="hero-stat">
-          <span class="hero-stat-num">{{ uniqueEpisodes.toLocaleString() }}</span>
+          <span class="hero-stat-num">{{
+            uniqueEpisodes.toLocaleString()
+            }}</span>
           <span class="hero-stat-label">集/集合</span>
+        </span>
+        <span class="hero-stat-sep">·</span>
+        <span class="hero-stat hero-stat--inline">
+          R2全力给你扒拉<span class="hero-stat-num">{{
+            r2BlobCount.toLocaleString()
+            }}</span>个字幕中
+        </span>
+        <span class="hero-stat-sep">·</span>
+        <span class="hero-stat hero-stat--inline">
+          B2划水给你松鼠<span class="hero-stat-num">{{
+            b2BlobCount.toLocaleString()
+            }}</span>个字幕中
         </span>
       </div>
     </header>
 
     <main>
-      <SearchBar
-        v-model="searchInput"
-        v-model:tmdbEnabled="tmdbEnabled"
-        :powWorking="powWorking"
-        :suggestions="suggestions"
-        @input="onInput"
-        @enter="onEnter"
-        @select="selectSuggestion"
-      />
+      <SearchBar v-model="searchInput" v-model:tmdbEnabled="tmdbEnabled" :powWorking="powWorking"
+        :suggestions="suggestions" @input="onInput" @enter="onEnter" @select="selectSuggestion" />
 
-      <ResultsGrid
-        :loading="loading"
-        :archives="groupedResults"
-        :seasonCounts="seasonCounts"
-        :searchInput="searchInput"
-        @downloadSingle="downloadSingle"
-        @downloadLangPack="downloadLangPack"
-      />
+      <ResultsGrid :loading="loading" :archives="groupedResults" :seasonCounts="seasonCounts" :searchInput="searchInput"
+        @downloadSingle="downloadSingle" @downloadLangPack="downloadLangPack" />
     </main>
 
     <footer>
@@ -378,7 +366,8 @@ async function doImportIdentity() {
       <span class="footer-versions">
         <span class="version-tag">前端 v{{ appVersion }}</span>
         <span class="version-sep">·</span>
-        <span class="version-tag">中继 {{ relayStatus?.version ? 'v' + relayStatus.version : '—' }}</span>
+        <span class="version-tag">中继
+          {{ relayStatus?.version ? "v" + relayStatus.version : "—" }}</span>
       </span>
     </footer>
   </div>
@@ -420,6 +409,10 @@ async function doImportIdentity() {
 
 .hero-stat-sep {
   opacity: 0.4;
+}
+
+.hero-stat--inline {
+  gap: 0;
 }
 
 /* ── Import modal ────────────────────────────────────────────── */
