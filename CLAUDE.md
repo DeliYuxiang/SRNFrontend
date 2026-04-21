@@ -4,12 +4,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-SRN Frontend — Vue 3 + Vite SPA for the **Subtitle Relay Network (SRN)**. Deployed to Cloudflare Pages; connects to the SRN Worker API at `https://srn.majiyabakunai.moe`.
+SRN Frontend — Vue 3 + Vite SPA for the **Subtitle Relay Network (SRN)**.
+
+### Deployment architecture
+
+```
+Browser / Feeder
+      │
+      ▼
+SRN Worker  (srn-worker.delibill.workers.dev / custom domain)
+  ├─ /v1/*   → Hono API routes (D1, R2, PoW auth)
+  ├─ /ui     → Scalar API docs
+  └─ /*      → proxied to CF Pages  ◄── this repo's output
+                  (index.html: no-cache, /assets/*: immutable)
+```
+
+The worker is the **single entry point** for both the API and the frontend. The frontend is built and deployed independently to Cloudflare Pages; the worker fetches it at request time. Hashed asset filenames (Vite default) mean browsers cache `/assets/*` forever and pick up updates automatically when `index.html` changes — no worker redeployment needed for frontend releases.
+
+`VITE_API_BASE` is intentionally left empty at build time. All API calls use relative paths (`/v1/…`), which resolve to the worker's own domain.
 
 ## Commands
 
 ```bash
-npm run dev          # Start dev server (proxies /v1/* to production API)
+npm run dev          # Start dev server (proxies /v1/* and /ui /doc to the worker)
 npm run build        # Type-check with vue-tsc, then build to dist/
 npm run preview      # Preview the production build locally
 npm run format:check # Check formatting (CI gate)
@@ -24,7 +41,7 @@ There is no test suite. CI (`ci.yml`) runs `format:check` and `build` on PRs.
 
 Every API request requires a client identity and a solved Proof-of-Work challenge:
 
-1. **`useIdentity`** (`src/composables/useIdentity.ts`) — generates or loads an Ed25519 keypair from `localStorage` (`srn_identity_v3`). Exports `identity` (pubHex/privHex) and `privKey` (a `CryptoKey`).
+1. **`useIdentity`** (`src/composables/useIdentity.ts`) — generates or loads an Ed25519 keypair from `localStorage` (`srn_identity_v3`). Exports `identity` (pubHex/privHex) and `privKey` (a `CryptoKey`). A modal in `App.vue` lets users import an existing raw-hex keypair; the raw 32-byte seed is wrapped into PKCS8 format before storage.
 
 2. **`usePoW`** (`src/composables/usePoW.ts`) — fetches a challenge from `/v1/challenge` (salt + difficulty `k`), then spawns a Web Worker to mine a SHA-256 nonce. The worker posts progress every 500 attempts.
 
@@ -43,7 +60,7 @@ Every API request requires a client identity and a solved Proof-of-Work challeng
 
 ### Dev proxy
 
-`vite.config.ts` proxies `/v1/*` to the production API so local dev works without CORS issues. `/favicon.svg` proxies to a local Cloudflare Worker on port 8787 (optional).
+`vite.config.ts` proxies `/v1/*`, `/ui`, and `/doc` to the worker so local dev works without CORS issues.
 
 ### Shared utility
 
@@ -51,4 +68,4 @@ Every API request requires a client identity and a solved Proof-of-Work challeng
 
 ## Deployment
 
-Merges to `main` deploy automatically to Cloudflare Pages via `deploy.yml`. PRs get a preview URL commented on them. Secrets required: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+Merges to `main` deploy automatically to Cloudflare Pages via `deploy.yml`. PRs get a preview URL commented on them. The CF Pages URL is only the CDN origin — users should access the app through the worker's domain. Secrets required: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.

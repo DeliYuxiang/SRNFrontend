@@ -7,19 +7,19 @@ export default defineConfig({
   server: {
     proxy: {
       "/v1": {
-        target: "https://srn-worker-preview.delibill.workers.dev",
+      target: "https://srn-worker.delibill.workers.dev",
         changeOrigin: true,
       },
       "/favicon.svg": {
-        target: "https://srn-worker-preview.delibill.workers.dev",
+        target: "https://srn-worker.delibill.workers.dev",
         changeOrigin: true,
       },
       "/ui": {
-        target: "https://srn-worker-preview.delibill.workers.dev",
+        target: "https://srn-worker.delibill.workers.dev",
         changeOrigin: true,
       },
       "/doc": {
-        target: "https://srn-worker-preview.delibill.workers.dev",
+        target: "https://srn-worker.delibill.workers.dev",
         changeOrigin: true,
       },
     },
