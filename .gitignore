@@ -6,3 +6,4 @@ src/types/srn-api.d.ts
 !.env.example
 *.local
 .DS_Store
+.nfs*
