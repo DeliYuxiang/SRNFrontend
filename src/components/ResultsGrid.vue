@@ -28,13 +28,12 @@ const emit = defineEmits<{
       :archive="archive"
       :seasonCounts="seasonCounts"
       @downloadSingle="emit('downloadSingle', $event)"
-      @downloadLangPack="(season, lang, items) => emit('downloadLangPack', season, lang, items)"
+      @downloadLangPack="
+        (season, lang, items) => emit('downloadLangPack', season, lang, items)
+      "
     />
 
-    <div
-      v-if="!archives.length && searchInput"
-      class="empty-state"
-    >
+    <div v-if="!archives.length && searchInput" class="empty-state">
       暂无索引结果
     </div>
   </div>

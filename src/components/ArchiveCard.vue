@@ -47,7 +47,9 @@ function epStatus(
             stroke-width="2.5"
             style="flex-shrink: 0"
           >
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <path
+              d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+            />
             <polyline points="15 3 21 3 21 9" />
             <line x1="10" y1="14" x2="21" y2="3" />
           </svg>
@@ -90,8 +92,11 @@ function epStatus(
           <span
             class="ep-count"
             :class="{
-              'ep-count--complete': epStatus(langGroup.items.length, season.season) === 'complete',
-              'ep-count--incomplete': epStatus(langGroup.items.length, season.season) === 'incomplete',
+              'ep-count--complete':
+                epStatus(langGroup.items.length, season.season) === 'complete',
+              'ep-count--incomplete':
+                epStatus(langGroup.items.length, season.season) ===
+                'incomplete',
             }"
           >
             {{ langGroup.items.length
@@ -108,7 +113,12 @@ function epStatus(
           <button
             class="pack-btn"
             @click="
-              emit('downloadLangPack', season.season, String(lang), langGroup.items)
+              emit(
+                'downloadLangPack',
+                season.season,
+                String(lang),
+                langGroup.items,
+              )
             "
           >
             季包下载

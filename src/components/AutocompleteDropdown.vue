@@ -20,9 +20,7 @@ const emit = defineEmits<{
     >
       <img
         :src="
-          s.poster_path
-            ? 'https://image.tmdb.org/t/p/w92' + s.poster_path
-            : ''
+          s.poster_path ? 'https://image.tmdb.org/t/p/w92' + s.poster_path : ''
         "
         class="suggestion-poster"
         alt=""

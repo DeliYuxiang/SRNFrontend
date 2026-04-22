@@ -2,7 +2,7 @@ import createClient, { type Middleware } from "openapi-fetch";
 import type { Ref } from "vue";
 import type { paths } from "../types/srn-api";
 import type { Identity, Challenge } from "../types/api";
-import { bytesToHex } from "../utils/hex";
+import { buildAuthHeaders } from "@srn/client";
 import { API_BASE } from "../config";
 
 /**
@@ -13,30 +13,6 @@ import { API_BASE } from "../config";
  */
 function isDownloadPath(url: string): boolean {
   return /\/v1\/events\/[^/]+\/content/.test(new URL(url).pathname);
-}
-
-/**
- * Build the auth headers for a request.
- *
- * - Regular requests: sign the Ed25519 public key hex.
- * - Download requests: sign the current UTC minute (anti-replay).
- */
-async function buildAuthHeaders(
-  id: Identity,
-  key: CryptoKey,
-  nonce: string,
-  message: string,
-): Promise<Record<string, string>> {
-  const sigBuf = await crypto.subtle.sign(
-    "Ed25519",
-    key,
-    new TextEncoder().encode(message),
-  );
-  return {
-    "X-SRN-PubKey": id.pubHex,
-    "X-SRN-Nonce": nonce,
-    "X-SRN-Signature": bytesToHex(sigBuf),
-  };
 }
 
 export function createSRNClient(
@@ -63,7 +39,7 @@ export function createSRNClient(
         : id.pubHex;
 
       const headers = await buildAuthHeaders(
-        id,
+        id.pubHex,
         key,
         challenge.value.nonce,
         message,
@@ -113,7 +89,7 @@ export function createSRNClient(
     async function doFetch(): Promise<Response> {
       const minute = String(Math.floor(Date.now() / 60000));
       const headers = await buildAuthHeaders(
-        id,
+        id.pubHex,
         key,
         challenge.value.nonce,
         minute,

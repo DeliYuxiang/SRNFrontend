@@ -1,6 +1,6 @@
 import { ref } from "vue";
-import type { Identity } from "../types/api";
-import { bytesToHex } from "../utils/hex";
+import { importPrivKey, bytesToHex } from "@srn/client";
+import type { Identity } from "@srn/client";
 
 const SRN_ID_STORE = "srn_identity_v3";
 
@@ -28,18 +28,7 @@ async function loadOrCreateIdentity(): Promise<Identity> {
   return id;
 }
 
-export async function importPrivKey(privHex: string): Promise<CryptoKey> {
-  const bytes = new Uint8Array(
-    privHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)),
-  );
-  return crypto.subtle.importKey(
-    "pkcs8",
-    bytes.buffer,
-    { name: "Ed25519" },
-    false,
-    ["sign"],
-  );
-}
+export { importPrivKey };
 
 export function useIdentity() {
   const identity = ref<Identity | null>(null);

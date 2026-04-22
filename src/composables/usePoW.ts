@@ -1,5 +1,9 @@
 import { ref } from "vue";
-import type { Challenge, PowWorkerMessage, PowWorkerRequest } from "../types/api";
+import type {
+  Challenge,
+  PowWorkerMessage,
+  PowWorkerRequest,
+} from "../types/api";
 import { API_BASE } from "../config";
 
 export function usePoW() {

@@ -1,46 +1,15 @@
-export interface Identity {
-  pubHex: string;
-  privHex: string;
-}
+// Protocol types — canonical definitions live in @srn/client.
+// Re-exported here so callers can import from a single location.
+export type { Identity, SRNEvent, TMDBResult } from "@srn/client";
+import type { ChallengeParams } from "@srn/client";
 
-export interface Challenge {
-  salt: string;
-  k: number;
-  nonce: string;
-  vip: boolean;
-}
-
-export interface SRNEvent {
-  id: string;
-  pubkey: string;
-  kind: number;
-  content_md5: string;
-  tags: string[][];
-  sig: string;
-  created_at: number;
-  tmdb_id: number;
-  season_num: number | null;
-  episode_num: number | null;
-  language: string | null;
-  archive_md5: string | null;
-  source_type: string | null;
-  source_uri: string | null;
-  filename?: string;
-}
-
-export interface TMDBResult {
-  id: number;
-  name?: string;
-  title?: string;
-  poster_path: string | null;
-  media_type: "tv" | "movie";
-  first_air_date?: string;
-  release_date?: string;
-}
+// Challenge extends the relay's ChallengeParams with the locally-mined nonce.
+// ChallengeParams = { salt, k, vip }; nonce is computed by the PoW worker.
+export type Challenge = ChallengeParams & { nonce: string };
 
 // Grouping types for display
 export interface LangGroup {
-  items: SRNEvent[];
+  items: import("@srn/client").SRNEvent[];
 }
 
 export interface SeasonGroup {
@@ -60,9 +29,9 @@ export interface ArchiveGroup {
 }
 
 export interface RelayStatus {
-  pubkey: string;   // RELAY_PUBLIC_KEY from /v1/identity, "" if unset
+  pubkey: string; // RELAY_PUBLIC_KEY from /v1/identity, "" if unset
   healthy: boolean; // false if fetch fails or returns non-2xx
-  version: string;  // worker version from /v1/identity, "" if unavailable
+  version: string; // worker version from /v1/identity, "" if unavailable
 }
 
 // PoW worker messages

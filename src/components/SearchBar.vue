@@ -39,7 +39,10 @@ const emit = defineEmits<{
           type="text"
           :value="props.modelValue"
           @input="
-            emit('update:modelValue', ($event.target as HTMLInputElement).value);
+            emit(
+              'update:modelValue',
+              ($event.target as HTMLInputElement).value,
+            );
             emit('input');
           "
           @keyup.enter="emit('enter')"
